@@ -5,7 +5,7 @@
 
 # These are the libraries used in the classifier.
 
-# In[21]:
+# In[1]:
 
 
 import random
@@ -13,13 +13,24 @@ import re
 from math import *
 
 
+# In[2]:
+
+
+def merge_files():
+    filenames = ["imdb_labelled.txt", "amazon_cells_labelled.txt", "yelp_labelled.txt"]
+    with open('newfile.txt', 'w') as outfile:
+        for fname in filenames:
+            with open(fname) as infile:
+                outfile.write(infile.read())
+
+
 # This block of code reads data from a text file, clean the data from the file and shuffle the sentences in the file. 
 
-# In[22]:
+# In[3]:
 
 
 def readTXTAndClean():
-    file = open("imdb_labelled.txt", "r") 
+    file = open("newfile.txt", "r") 
     mass_list=[]
 
     a_line = file.readlines()
@@ -35,12 +46,12 @@ def readTXTAndClean():
 
 # This function splits the file into testdata and training data
 
-# In[23]:
+# In[25]:
 
 
 def split_Data(massList):
-    split1= round(len(massList)*0.8)
-    split2= round(len(massList)*0.2)
+    split1= round(len(massList)*0.9)
+    split2= round(len(massList)*0.1)
     
     trainingData= massList[slice(0,split1)]
     testingData= massList[slice(0,split2)]
@@ -50,7 +61,7 @@ def split_Data(massList):
 
 # The sort_List fucntion sorts thadata into two classes, creates a bag of words, counts the totalnumber of sentences and the number of sentences per class.
 
-# In[15]:
+# In[26]:
 
 
 def sort_List(trainingData):
@@ -59,8 +70,6 @@ def sort_List(trainingData):
     nOfBSent=0
     goodClass=[]
     badClass=[]
-    
-    
     
     for item in trainingData:
         classOfSentence = trainingData[count][-1]
@@ -83,7 +92,7 @@ def sort_List(trainingData):
     bagOfWords.update(badClassDict)
     
  
-    return goodClassDict, badClassDict, bagOfWords, nOfBSent, nOfBSent, count
+    return goodClassDict, badClassDict, bagOfWords, nOfGSent, nOfBSent, count
 
 
 # The logprior function calculates the logprior per class using;
@@ -91,24 +100,27 @@ def sort_List(trainingData):
 
 # $$\log \frac{N_c}{N_{doc}}$$
 
-# In[16]:
+# In[27]:
 
 
 def logPior(noofgoodSent, noofbadSent, noofSent):    
-    logpriorGood= noofgoodSent/noofSent
-    logpriorBad= noofbadSent/noofSent
+    logpriorGood= log10(noofgoodSent/noofSent)
+    logpriorBad= log10(noofbadSent/noofSent)
 
-    
+    print(logpriorGood, logpriorBad)
     return logpriorGood, logpriorBad
 
 
-# In[17]:
+# $$\log \frac{count(w,c)+1}{\sum_{w\in v}(count(w′,c)+1)}$$
+
+# In[28]:
 
 
 def baseloglikelyhood(the_Class,bagOfWords):
     loglikelyhood = 0
     countVocab= len(bagOfWords)
     total_words_per_class= sum(the_Class.values())
+#     print(the_Class.values())
     
     denominator= countVocab+ total_words_per_class
     
@@ -116,22 +128,20 @@ def baseloglikelyhood(the_Class,bagOfWords):
     for key, value in bagOfWords.items():
         if key in the_Class.keys():
             count= the_Class[key]+1
-            loglikelyhood = log(count/denominator)
+            loglikelyhood = log10(count/denominator)
         else:
             count= 1
-            loglikelyhood = log(count/denominator)
+            loglikelyhood = log10(count/denominator)
         
             
-    return float(loglikelyhood)
+    return(loglikelyhood)
     
 
 
 # The loglikelyhood function uses the baseloglikelyhood funtion to calculate the log likelyhood per word.
 # It returns two dictionaries, likelyhoodgood, likelyhoodbad using;
 
-# $$\log \frac{count(w,c)+1}{\sum_{w\in v}(count(w′,c)+1)}$$
-
-# In[18]:
+# In[29]:
 
 
 def loglikelyhood(goodDict, badDict, wordBag):
@@ -151,38 +161,58 @@ def loglikelyhood(goodDict, badDict, wordBag):
     
 
 
-# In[19]:
+# In[32]:
 
 
-#def test_naive_Bayes():
+def test_naive_Bayes(testClass,logprobofGoodwords, logprobofBadwords, logProbGood,logProbBad ):
+    
+    outcome={}
+    is_pos= logprobofGoodwords
+    is_neg= logprobofBadwords
+
+    for i in range(len(testClass)):
+        a_sentence = testClass[i]
+        words = testClass[i][0:-2].split()
+    
+        for i in words: 
+            if i in logProbGood.keys():
+                is_pos = is_pos + logProbGood[i]
+                
+        for i in words: 
+            if i in logProbBad.keys():
+                is_neg = is_neg + logProbBad[i]
+                
+        print(is_pos,is_neg)
+        if (is_pos >= is_neg):
+            outcome[1] = a_sentence
+        elif (is_pos < is_neg):
+            outcome[0] = a_sentence
+        print(outcome)
+        #print("pos:{}\t neg:{}".format(is_pos, is_neg))
+    
+     
 
 
-# In[20]:
+# In[33]:
 
 
 def main():
-    
+    merge_files()
+   
     #this trains the Naive Bayes Classifier
     massList = readTXTAndClean()
     trainingData, testingData = split_Data(massList)
     goodDict, badDict, wordBag, noofgoodSent, noofbadSent, noofSent  = sort_List(trainingData)
     logprobofGoodwords, logprobofBadwords = logPior(noofgoodSent, noofbadSent, noofSent)
-    logProbs = loglikelyhood(goodDict, badDict, wordBag)
+    logProbGood,logProbBad = loglikelyhood(goodDict, badDict, wordBag)
+    for i in goodDict:
+        print("{} -> {}".format(i, goodDict[i]))
     
+    for i in badDict:
+        print("{} -> {}".format(i, badDict[i]))
     #this tests the 
+    test_naive_Bayes(testingData,logprobofGoodwords, logprobofBadwords, logProbGood,logProbBad)
 main()
-
-
-# In[ ]:
-
-
-
-
-
-# In[ ]:
-
-
-
 
 
 # In[ ]:
