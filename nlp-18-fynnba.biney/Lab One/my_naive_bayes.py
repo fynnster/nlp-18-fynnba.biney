@@ -38,6 +38,7 @@ def readTXTAndClean():
     for line in a_line:
         c_line = re.sub(r"[\n\t!';:£*():?%$#+]", "", line.lower())
         mass_list.append(re.sub(r"[\n,.-/]","", c_line))
+    
 
     random.shuffle(mass_list)
     file.close()
@@ -46,12 +47,12 @@ def readTXTAndClean():
 
 # This function splits the file into testdata and training data
 
-# In[25]:
+# In[4]:
 
 
 def split_Data(massList):
-    split1= round(len(massList)*0.9)
-    split2= round(len(massList)*0.1)
+    split1= round(len(massList)*.8)
+    split2= round(len(massList)*.2)
     
     trainingData= massList[slice(0,split1)]
     testingData= massList[slice(0,split2)]
@@ -61,7 +62,7 @@ def split_Data(massList):
 
 # The sort_List fucntion sorts thadata into two classes, creates a bag of words, counts the totalnumber of sentences and the number of sentences per class.
 
-# In[26]:
+# In[5]:
 
 
 def sort_List(trainingData):
@@ -91,7 +92,9 @@ def sort_List(trainingData):
     bagOfWords = goodClassDict.copy()
     bagOfWords.update(badClassDict)
     
- 
+    #print(bagOfWords)
+    
+
     return goodClassDict, badClassDict, bagOfWords, nOfGSent, nOfBSent, count
 
 
@@ -100,7 +103,7 @@ def sort_List(trainingData):
 
 # $$\log \frac{N_c}{N_{doc}}$$
 
-# In[27]:
+# In[6]:
 
 
 def logPior(noofgoodSent, noofbadSent, noofSent):    
@@ -113,90 +116,120 @@ def logPior(noofgoodSent, noofbadSent, noofSent):
 
 # $$\log \frac{count(w,c)+1}{\sum_{w\in v}(count(w′,c)+1)}$$
 
-# In[28]:
+# In[7]:
 
 
 def baseloglikelyhood(the_Class,bagOfWords):
     loglikelyhood = 0
     countVocab= len(bagOfWords)
+    loglikely= {}
     total_words_per_class= sum(the_Class.values())
 #     print(the_Class.values())
     
-    denominator= countVocab+ total_words_per_class
+    denominator = total_words_per_class + countVocab
     
     
     for key, value in bagOfWords.items():
         if key in the_Class.keys():
-            count= the_Class[key]+1
-            loglikelyhood = log10(count/denominator)
+            count= the_Class[key] + 1
+            loglikelyhood = log(count/denominator)
+            loglikely[key]= loglikelyhood
+            
         else:
             count= 1
-            loglikelyhood = log10(count/denominator)
+            loglikelyhood = log(count/denominator)
+            loglikely[key]= loglikelyhood
         
-            
-    return(loglikelyhood)
+       
+    return loglikely
     
+
+
+# In[8]:
+
+
+def x(bagOfWords,the_Class, word):
+    if word in the_Class.keys():
+        numerator = the_Class[word] +1
+    else:
+        numerator = 1   
+    
+    
+    denominator= len(set(bagOfWords.keys()) - set(the_Class.keys()))+len(the_Class.keys())
+    denominator+= sum(the_Class.values())
+    
+    log_likelihood =  log(numerator/denominator)
+    
+    
+    
+    return log_likelihood
 
 
 # The loglikelyhood function uses the baseloglikelyhood funtion to calculate the log likelyhood per word.
 # It returns two dictionaries, likelyhoodgood, likelyhoodbad using;
 
-# In[29]:
+# In[9]:
 
 
 def loglikelyhood(goodDict, badDict, wordBag):
-    likelihood_dict={}
-    likelyhoodgood=[]
-    likelyhoodbad=[]
+    likelyhoodgood={}
+    likelyhoodbad={}
     words=[]
-    for key, value in wordBag.items():
-        words.append(key)
-        likelyhoodgood.append(baseloglikelyhood(goodDict,wordBag))
-        likelyhoodbad.append(baseloglikelyhood(badDict,wordBag))
-        
-    likelyhoodgood = dict(zip(words, likelyhoodgood))
-    likelyhoodbad = dict(zip(words, likelyhoodbad))
+    
+ 
+    likelyhoodgood = baseloglikelyhood(goodDict,wordBag)
+    likelyhoodbad = baseloglikelyhood(badDict,wordBag)
     
     return likelyhoodgood, likelyhoodbad
     
 
 
-# In[32]:
+# In[23]:
 
 
 def test_naive_Bayes(testClass,logprobofGoodwords, logprobofBadwords, logProbGood,logProbBad ):
     
-    outcome={}
-    is_pos= logprobofGoodwords
-    is_neg= logprobofBadwords
+    outcome=[]
+    pos= 0
+    neg= 0
 
     for i in range(len(testClass)):
         a_sentence = testClass[i]
-        words = testClass[i][0:-2].split()
+        words = testClass[i][0:-1].split()
+        
     
-        for i in words: 
-            if i in logProbGood.keys():
-                is_pos = is_pos + logProbGood[i]
+        for j in words: 
+            if j in logProbGood.keys():
+                pos = logprobofGoodwords + logProbGood[j]
                 
-        for i in words: 
-            if i in logProbBad.keys():
-                is_neg = is_neg + logProbBad[i]
+        for j in words: 
+            if j in logProbBad.keys():
+                neg = logprobofBadwords + logProbBad[j]
                 
-        print(is_pos,is_neg)
-        if (is_pos >= is_neg):
-            outcome[1] = a_sentence
-        elif (is_pos < is_neg):
-            outcome[0] = a_sentence
-        print(outcome)
-        #print("pos:{}\t neg:{}".format(is_pos, is_neg))
+        
+        with open("results_n_myLogReg.txt", "w+") as file:
+        file.write(outcome)
+        
+        if (pos > neg):
+            outcome.append(1)
+            print(1, a_sentence)
+        elif (pos < neg):
+            outcome.append(0)
+            print(0, a_sentence)
+        
+        with open("results.txt", "w+") as file:
+            file.write(str(outcome,a_sentence))
+
+        
+    return outcome
     
      
 
 
-# In[33]:
+# In[22]:
 
 
-def main():
+def runAll():
     merge_files()
    
     #this trains the Naive Bayes Classifier
@@ -205,14 +238,30 @@ def main():
     goodDict, badDict, wordBag, noofgoodSent, noofbadSent, noofSent  = sort_List(trainingData)
     logprobofGoodwords, logprobofBadwords = logPior(noofgoodSent, noofbadSent, noofSent)
     logProbGood,logProbBad = loglikelyhood(goodDict, badDict, wordBag)
-    for i in goodDict:
-        print("{} -> {}".format(i, goodDict[i]))
     
-    for i in badDict:
-        print("{} -> {}".format(i, badDict[i]))
-    #this tests the 
+    
+
     test_naive_Bayes(testingData,logprobofGoodwords, logprobofBadwords, logProbGood,logProbBad)
-main()
+    
+runAll()
+
+
+# In[10]:
+
+
+
+
+
+# In[ ]:
+
+
+
+
+
+# In[ ]:
+
+
+
 
 
 # In[ ]:
